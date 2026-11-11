@@ -7,7 +7,9 @@ An Arduino Uno system that watches a plant's light, temperature, humidity, soil 
 
 **▶ [Run it in your browser on Wokwi](https://wokwi.com/projects/480434156220494849)** (no hardware or install needed)
 
-[![Wokwi simulation](media/2026-wokwi-lcd.jpg)](https://wokwi.com/projects/480434156220494849)
+**📄 [Read the paper (PDF, 4 pages)](docs/paper/paper.pdf)**: design, implementation and verification.
+
+[![Wokwi simulation of the full circuit](media/2026-wokwi-simulation.jpg)](https://wokwi.com/projects/480434156220494849)
 
 ## Motivation
 
@@ -40,9 +42,7 @@ Manually checking and watering plants is time-consuming and easy to get wrong. T
 
 ## Architecture
 
-| Block diagram (2020 report) | Control flow (2020 report) |
-|---|---|
-| ![Block diagram](media/2020-block-diagram.png) | ![Flowchart](media/2020-flowchart.png) |
+![System architecture](docs/architecture.png)
 
 **Control rules** (thresholds from the 2020 project; inside each "optimal" band the output keeps its last state):
 
@@ -76,7 +76,7 @@ The decision logic lives in [`src/plant_monitor/control.h`](src/plant_monitor/co
 
 ## Results
 
-**2020 hardware test:** the system ran on a real Arduino Uno with a DHT11 and a 20x4 I2C LCD; the actuators were represented by LEDs. Photos from the report:
+**2020 hardware prototype:** ran on a real Arduino Uno with a DHT11 and a 20x4 I2C LCD; the actuators were represented by LEDs.
 
 | High humidity → fan | Dark → lamp on | Empty tank |
 |---|---|---|
@@ -86,11 +86,7 @@ The decision logic lives in [`src/plant_monitor/control.h`](src/plant_monitor/co
 
 ![Data log](media/2020-data-log.png)
 
-The report also contains a Proteus results table. It does not fully agree with the code's thresholds (for example, light 123 is listed as "lamp on"), so I have not reproduced it here; the hardware photos above match the code.
-
-**2026 Wokwi simulation:** the refactored sketch compiles and runs in Wokwi. With the default sensor values (24 °C, 40 % RH, dark, soil dry, tank 68 %) it turns on the grow lamp, heat lamp, spray and, through the relay, the pump:
-
-![Relay driving the pump LED in Wokwi](media/2026-wokwi-relay-pump.jpg)
+**2026 Wokwi simulation:** the rebuilt sketch compiles and runs in Wokwi. With the default sensor values (24 °C, 40 % RH, dark, soil dry, tank 68 %) it turns on the grow lamp, heat lamp, spray and, through the relay, the pump (screenshot at the top). With an empty tank the refill warning comes on and the pump stays locked out. Both test cases are in Table 3 of the [paper](docs/paper/paper.pdf).
 
 **Unit tests:** `tests/test_control.cpp` checks every threshold, the hold-in-band behaviour, fail-safe on DHT read errors, the pump lockout and the clamping that fixes the -86 % bug.
 
@@ -133,8 +129,8 @@ g++ -std=c++11 -Wall -I../src/plant_monitor test_control.cpp -o test_control && 
 src/plant_monitor/   refactored sketch + control.h (decision logic)
 tests/               host-side unit tests for control.h
 wokwi/               diagram.json, libraries.txt, wokwi.toml
-docs/                wiring diagram (SVG + PNG)
-media/               figures and photos from the 2020 report, 2026 simulation screenshots
+docs/                paper (PDF + LaTeX source), architecture and wiring diagrams
+media/               2020 prototype photos and data log, 2026 simulation screenshot
 original/            my 2020 sketch (light, humidity, water level), unchanged
 ```
 

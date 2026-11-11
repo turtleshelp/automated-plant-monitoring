@@ -17,3 +17,11 @@ tests/*.exe
 Thumbs.db
 desktop.ini
 .vscode/
+
+# LaTeX build files
+*.aux
+*.log
+*.out
+*.fls
+*.fdb_latexmk
+*.synctex.gz
