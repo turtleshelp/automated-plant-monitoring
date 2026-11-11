@@ -1,0 +1,19 @@
+# Build output
+build/
+*.hex
+*.elf
+*.bin
+
+# Host test binaries
+tests/test_control
+tests/*.exe
+
+# Proteus backups / workspaces
+*.pdsbak
+*.workspace
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
