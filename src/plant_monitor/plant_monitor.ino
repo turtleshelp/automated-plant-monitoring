@@ -1,7 +1,7 @@
 /*
  * Automated Plant Growing & Monitoring System
  * -------------------------------------------
- * Refactored in 2026 from the 2020 APU course-project code (see ../../original/).
+ * Rebuilt in 2026 from the 2020 university course-project version (see ../../original/).
  * Same sensors and thresholds as 2020; bugs fixed, non-blocking loop, and a
  * relay-driven irrigation pump added as a clearly marked 2026 extension.
  *

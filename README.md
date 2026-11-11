@@ -2,8 +2,8 @@
 
 An Arduino Uno system that watches a plant's light, temperature, humidity, soil moisture and water tank, switches a grow lamp, fan, heat lamp, water spray and irrigation pump to keep it in an optimal range, and shows the readings on a 20x4 LCD.
 
-> **Originally developed 2020 (APU course project); refactored from the surviving code and report in 2026.**
-> The original code is kept unchanged in [`original/`](original/). The code in [`src/`](src/) is a 2026 rewrite with the same sensors and thresholds. The relay-driven pump is a 2026 addition, marked as such throughout.
+> **Originally developed in 2020 as a university course project; rebuilt in 2026.**
+> My original 2020 sketch is kept unchanged in [`original/`](original/). The code in [`src/`](src/) is the 2026 rebuild with the same sensors and thresholds. The relay-driven pump is a 2026 addition, marked as such throughout.
 
 **▶ [Run it in your browser on Wokwi](https://wokwi.com/projects/480434156220494849)** (no hardware or install needed)
 
@@ -11,21 +11,22 @@ An Arduino Uno system that watches a plant's light, temperature, humidity, soil 
 
 ## Motivation
 
-Manually checking and watering plants is time-consuming and easy to get wrong. The course brief was to design a microcontroller control system that reads input parameters, drives outputs and displays both. Our group chose an automated plant monitor: sense the growing conditions and react automatically, so the plant needs less human attention and less water is wasted.
+Manually checking and watering plants is time-consuming and easy to get wrong. The goal was a microcontroller control system that reads input parameters, drives outputs and displays both, applied to a plant: sense the growing conditions and react automatically, so the plant needs less human attention and less water is wasted.
 
-## My role
+## What I built
 
-This was a **group project of three students** (Microprocessor Systems & Embedded Software module, B.Eng. Mechatronics, Asia Pacific University, Kuala Lumpur, Aug–Sep 2020). Each member built one subsystem and the group integrated them.
+**2026 rebuild:**
+- Rewrote the full system (light, temperature, humidity, soil moisture, water level) as a non-blocking Arduino sketch.
+- Separated the decision logic into [`control.h`](src/plant_monitor/control.h) so it can be unit-tested on a PC, and wrote the tests.
+- Fixed the bugs in the 2020 code (listed in [`original/README.md`](original/README.md)) and added fail-safe handling for sensor errors.
+- Added a relay-driven irrigation pump with dry-run protection.
+- Built the Wokwi simulation and the wiring diagram.
 
-**My part (individual component):**
+**2020 version** (Microprocessor Systems & Embedded Software module, B.Eng. Mechatronics, Asia Pacific University, Kuala Lumpur, Aug–Sep 2020):
 - **Light control:** LDR light sensor; grow lamp switched on when dark, off when bright, unchanged in between.
 - **Humidity control:** DHT11 sensor; water spray on when the air is too dry, fan on when too humid.
-- **Enhancement:** a water-level sensor on the spray's water tank, so the user knows when to refill.
-- Interface design, Arduino code, Proteus simulation, hardware test and my section of the report.
-
-**Teammates' parts:** temperature control (fan / heat lamp) and soil moisture, plus joint integration, testing and presentation.
-
-**2026 (solo):** refactored the code, fixed the bugs listed in [`original/README.md`](original/README.md), separated the decision logic so it can be unit-tested, added the relay/pump extension, and built the Wokwi simulation and wiring diagram.
+- **Water-level monitoring** on the spray's water tank, so the user knows when to refill.
+- Interface design, Arduino code, Proteus simulation and hardware test.
 
 ## Tech stack
 
@@ -81,7 +82,7 @@ The decision logic lives in [`src/plant_monitor/control.h`](src/plant_monitor/co
 |---|---|---|
 | ![](media/2020-hardware-lcd-humidity.jpg) | ![](media/2020-hardware-lcd-light.jpg) | ![](media/2020-hardware-lcd-water-level.jpg) |
 
-**2020 data log** (Serial → Excel Data Streamer, about 30 s at room conditions): light ≈ 277, 28.1 °C, 76–77 % RH. The moisture column reads **-86 %**, which is a bug: the soil reading was not clamped (see [`original/README.md`](original/README.md)).
+**2020 data log** (Serial → Excel Data Streamer, about 30 s at room conditions): light ≈ 277, 28.1 °C, 76–77 % RH. The moisture column reads **-86 %**, which is a bug: the 2020 soil mapping (`map(raw, 550, 10, 0, 100)`) was not clamped, so an out-of-range reading went negative. The 2026 version clamps it.
 
 ![Data log](media/2020-data-log.png)
 
@@ -134,7 +135,7 @@ tests/               host-side unit tests for control.h
 wokwi/               diagram.json, libraries.txt, wokwi.toml
 docs/                wiring diagram (SVG + PNG)
 media/               figures and photos from the 2020 report, 2026 simulation screenshots
-original/            unmodified 2020 code (my individual sketch + the group's integrated sketch)
+original/            my 2020 sketch (light, humidity, water level), unchanged
 ```
 
 ## Status
@@ -150,8 +151,7 @@ Complete as a portfolio piece. The 2020 hardware no longer exists; the 2026 vers
 
 ## Credits
 
-- Muhammad Ali Sadiq: light and humidity subsystems, water-level enhancement, 2026 refactor.
-- Two teammates at Asia Pacific University: temperature and soil-moisture subsystems, group integration.
+- Author: Muhammad Ali Sadiq
 - Libraries: [Adafruit DHT sensor library](https://github.com/adafruit/DHT-sensor-library), [LiquidCrystal I2C](https://github.com/johnrickman/LiquidCrystal_I2C).
 
 Licensed under the [MIT License](LICENSE).

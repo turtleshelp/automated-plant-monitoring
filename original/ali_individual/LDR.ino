@@ -37,7 +37,7 @@ void setup() {
   lcd.setCursor (0, 2);
   lcd.print("By");
   lcd.setCursor (0, 3);
-  lcd.print("Ali + team"); // [2026] teammates' names removed for publication
+  lcd.print("Ali"); // [2026] splash text edited for publication
   delay(2000);
 }
 

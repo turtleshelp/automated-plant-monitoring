@@ -62,11 +62,11 @@ inline bool isNan(float x) { return x != x; }
 inline Outputs update(const Readings& r, const Outputs& prev) {
   Outputs o = prev;
 
-  // Light (Ali, 2020)
+  // Light
   if (r.light > LIGHT_DARK_ABOVE)        o.growLamp = true;
   else if (r.light < LIGHT_BRIGHT_BELOW) o.growLamp = false;
 
-  // Humidity (Ali, 2020) and temperature (team, 2020) share the fan.
+  // Humidity and temperature share the fan.
   // Spray holds its state in the optimal band; the fan is only requested
   // while a reading is actually too high.
   bool fanForHumidity = false;
@@ -84,7 +84,7 @@ inline Outputs update(const Readings& r, const Outputs& prev) {
   }
   o.fan = fanForHumidity || fanForTemp;
 
-  // Water tank (Ali's enhancement, 2020; hysteresis added 2026)
+  // Water tank (hysteresis added 2026)
   if (r.tankPct < TANK_LOW_BELOW)     o.refill = true;
   else if (r.tankPct > TANK_OK_ABOVE) o.refill = false;
 
