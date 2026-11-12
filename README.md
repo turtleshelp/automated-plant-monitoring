@@ -1,153 +1,137 @@
 # Automated Plant Growing & Monitoring System
 
-An Arduino Uno system that watches a plant's light, temperature, humidity, soil moisture and water tank, switches a grow lamp, fan, heat lamp, water spray and irrigation pump to keep it in an optimal range, and shows the readings on a 20x4 LCD.
+An Arduino Uno system that monitors a plant's light, temperature, humidity, soil moisture and water tank, switches a grow lamp, fan, heat lamp, water spray and watering indicator to keep each value in an optimal range, and shows the readings on a 20x4 I2C LCD. Designed, simulated in Proteus and tested on hardware in 2020.
 
-> **Originally developed in 2020 as a university course project; rebuilt in 2026.**
-> My original 2020 sketch is kept unchanged in [`original/`](original/). The code in [`src/`](src/) is the 2026 rebuild with the same sensors and thresholds. The relay-driven pump is a 2026 addition, marked as such throughout.
+**Author:** Muhammad Ali Sadiq\*\*
+<br>\*\* *Developed as a group course project at Asia Pacific University (APU), Kuala Lumpur, Aug–Sep 2020, together with **Nabeel** (temperature control) and **Shimal** (documentation). See [Credits](#credits).*
 
-**▶ [Run it in your browser on Wokwi](https://wokwi.com/projects/480434156220494849)** (no hardware or install needed)
+**📄 [Paper (PDF)](docs/paper/paper.pdf)**: design, implementation and results &nbsp;·&nbsp; **[Individual report, 2020 (PDF)](docs/report/individual_report_2020.pdf)**
 
-**📄 [Read the paper (PDF, 4 pages)](docs/paper/paper.pdf)**: design, implementation and verification.
-
-[![Wokwi simulation of the full circuit](media/2026-wokwi-simulation.jpg)](https://wokwi.com/projects/480434156220494849)
+![Combined system in Proteus](media/2020-proteus-integrated-system.png)
 
 ## Motivation
 
-Manually checking and watering plants is time-consuming and easy to get wrong. The goal was a microcontroller control system that reads input parameters, drives outputs and displays both, applied to a plant: sense the growing conditions and react automatically, so the plant needs less human attention and less water is wasted.
+Checking and watering plants by hand takes time and is easy to get wrong. The goal was a microcontroller system that reads the plant's environment, reacts automatically to keep it in the optimal range, and displays every reading and action, so the plant needs less attention and less water is wasted.
 
-## What I built
+## My role
 
-**2026 rebuild:**
-- Rewrote the full system (light, temperature, humidity, soil moisture, water level) as a non-blocking Arduino sketch.
-- Separated the decision logic into [`control.h`](src/plant_monitor/control.h) so it can be unit-tested on a PC, and wrote the tests.
-- Fixed the bugs in the 2020 code (listed in [`original/README.md`](original/README.md)) and added fail-safe handling for sensor errors.
-- Added a relay-driven irrigation pump with dry-run protection.
-- Built the Wokwi simulation and the wiring diagram.
-
-**2020 version** (Microprocessor Systems & Embedded Software module, B.Eng. Mechatronics, Asia Pacific University, Kuala Lumpur, Aug–Sep 2020):
-- **Light control:** LDR light sensor; grow lamp switched on when dark, off when bright, unchanged in between.
-- **Humidity control:** DHT11 sensor; water spray on when the air is too dry, fan on when too humid.
-- **Water-level monitoring** on the spray's water tank, so the user knows when to refill.
-- Interface design, Arduino code, Proteus simulation and hardware test.
+- **Light control:** LDR sensor; grow lamp on when dark, off when bright, no change in between.
+- **Humidity control:** DHT11 sensor; spray on when too dry, fan on when too humid.
+- **Water-level monitoring** of the spray tank, so the user knows when to refill.
+- **Soil-moisture control:** watering indicator on when the soil is dry, off when wet.
+- **System integration** and the **Proteus simulation** of the combined system, together with Nabeel.
+- Arduino code, LCD interface, hardware test and serial data logging for my subsystems; my individual report.
 
 ## Tech stack
 
 | | |
 |---|---|
 | Microcontroller | Arduino Uno (ATmega328P) |
-| Sensors | DHT11 temperature + humidity (DHT22 in Wokwi), LDR light sensor, soil-moisture sensor, water-level sensor |
-| Outputs | 20x4 I2C LCD, LED indicators standing in for lamp / fan / heat lamp / spray, relay module + pump (2026) |
+| Sensors | DHT11 (temperature + humidity), LDR, soil-moisture sensor, water-level sensor; LM35 in the individual temperature prototype |
+| Outputs | 20x4 LCD via PCF8574 I2C backpack, LEDs, DC motors (fan / spray / pump) in simulation |
 | Language | Arduino C/C++ |
-| Tools | Proteus (2020 simulation), Excel Data Streamer (2020 logging), Wokwi (2026 simulation), g++ (host unit tests) |
+| Tools | Proteus (simulation), Arduino IDE, Excel Data Streamer (logging) |
 
 ## Architecture
 
-![System architecture](docs/architecture.png)
+| Block diagram | Control flow (light and humidity) |
+|---|---|
+| ![Block diagram](media/2020-block-diagram.png) | ![Flowchart](media/2020-flowchart.png) |
 
-**Control rules** (thresholds from the 2020 project; inside each "optimal" band the output keeps its last state):
+The firmware reads every sensor at the start of each loop, then works through the subsystems one after another. Each one shows its reading on the LCD, sets its indicator outputs and holds the screen for 2 s.
 
 | Input | Condition | Action |
 |---|---|---|
-| Light (raw ADC, higher = darker) | > 200 | Grow lamp ON |
-| | < 150 | Grow lamp OFF |
-| Humidity | > 60 % | Fan ON, spray OFF |
+| Light (raw ADC, higher = darker) | > 200 | Lamp ON ("ITS DARK") |
+| | < 150 | Lamp OFF ("ITS BRIGHT") |
+| | 150–200 | No action |
+| Humidity (my individual system) | > 60 % | Fan ON |
 | | < 50 % | Spray ON |
 | Temperature | > 29 °C | Fan ON |
-| | < 27 °C | Heat lamp ON |
-| Water tank | < 20 % | Refill warning (clears above 30 %), pump locked out |
-| Soil moisture *(2026: drives pump)* | < 20 % | Pump ON |
-| | > 50 % | Pump OFF |
+| | 27–29 °C | Normal |
+| | otherwise | Heat lamp ON |
+| Soil moisture | < 20 % | Watering ON |
+| | > 50 % | Watering OFF |
+| Water tank | < 20 % | "LOW" (refill needed) |
+| | > 80 % | "HIGH" |
 
-The decision logic lives in [`src/plant_monitor/control.h`](src/plant_monitor/control.h) with no Arduino dependencies; the sketch only reads sensors, calls `plant::update()` and writes outputs. The loop is non-blocking (`millis()`), samples every 2 s, prints a CSV line to Serial and rotates the bottom half of the LCD every 3 s.
+### Circuit (Proteus)
 
-### Wiring
+My light, humidity and LCD circuit ([`simulation/LDR.pdsprj`](simulation/LDR.pdsprj)):
 
-![Wiring diagram](docs/wiring.png)
+![Light and humidity circuit](media/2020-proteus-light-humidity-circuit.png)
 
-| Uno pin | Connected to |
-|---|---|
-| D2 | DHT22 / DHT11 data |
-| A0 | LDR module AO |
-| A1 | Water-level sensor (potentiometer in Wokwi) |
-| A2 | Soil-moisture sensor (potentiometer in Wokwi) |
-| A4 / A5 | LCD I2C SDA / SCL (address 0x27) |
-| D3 – D7 | LEDs + 220 Ω: grow lamp, fan, heat lamp, spray, refill |
-| D8 | Relay module IN (2026), relay switches the pump |
+Pin use: LDR on A0, water level on A1, soil moisture on A3 (integrated system), DHT11 on D2, LCD over I2C on A4/A5 (PCF8574 at 0x27), indicator LEDs and motors on D0–D13.
 
 ## Results
 
-**2020 hardware prototype:** ran on a real Arduino Uno with a DHT11 and a 20x4 I2C LCD; the actuators were represented by LEDs.
+**Proteus simulation:** each light and humidity rule was tested by moving the LDR and DHT11 values in the simulation:
 
-| High humidity → fan | Dark → lamp on | Empty tank |
+![LCD states in Proteus](media/2020-proteus-lcd-states.png)
+
+**Hardware test:** the system ran on a real Arduino Uno with a DHT11 and a 20x4 I2C LCD:
+
+| High humidity → fan on | Dark → light on | Empty tank → low |
 |---|---|---|
 | ![](media/2020-hardware-lcd-humidity.jpg) | ![](media/2020-hardware-lcd-light.jpg) | ![](media/2020-hardware-lcd-water-level.jpg) |
 
-**2020 data log** (Serial → Excel Data Streamer, about 30 s at room conditions): light ≈ 277, 28.1 °C, 76–77 % RH. The moisture column reads **-86 %**, which is a bug: the 2020 soil mapping (`map(raw, 550, 10, 0, 100)`) was not clamped, so an out-of-range reading went negative. The 2026 version clamps it.
+**Data logging:** readings were streamed over serial into Excel Data Streamer: 15 samples over 31 s, light 276–280, 28.1–28.2 °C, 76–77 % RH.
 
 ![Data log](media/2020-data-log.png)
 
-**2026 Wokwi simulation:** the rebuilt sketch compiles and runs in Wokwi. With the default sensor values (24 °C, 40 % RH, dark, soil dry, tank 68 %) it turns on the grow lamp, heat lamp, spray and, through the relay, the pump (screenshot at the top). With an empty tank the refill warning comes on and the pump stays locked out. Both test cases are in Table 3 of the [paper](docs/paper/paper.pdf).
+### Known issues
 
-**Unit tests:** `tests/test_control.cpp` checks every threshold, the hold-in-band behaviour, fail-safe on DHT read errors, the pump lockout and the clamping that fixes the -86 % bug.
+A 2026 review of the code found these defects. They are left in the code as it was in 2020:
 
-What could **not** be reproduced: no real pump, fan or lamp was ever driven (2020 or 2026), and the soil and water sensors in Wokwi are potentiometers, so the calibration values are from the 2020 code, not new measurements.
+- **Integrated system** ([`PLANT_MONITOR.ino`](code/integrated_system/PLANT_MONITOR.ino)):
+  - the water level is calculated from the soil sensor's pin (A3) instead of the water sensor (A1);
+  - the humidity limits were changed to `> 50` / `< 0`, so the spray can never switch on;
+  - the soil mapping `map(raw, 550, 10, 0, 100)` is not clamped (the likely source of the −86 % moisture in the data log) and is then overwritten by a second variable with the same name;
+  - exactly 29 °C turns the heat lamp on.
+- **Both sketches:**
+  - range checks such as `150 > x < 200` are not valid comparisons in C; they only give the right result because they are reached after the other branches;
+  - LEDs on pins 0/1 share the Uno's serial lines;
+  - a failed DHT reading is displayed as "optimal";
+  - `delay(2000)` per screen makes one loop take several seconds.
 
 ## How to run
 
-### Run it in the Wokwi simulator (no hardware)
-
-**In the browser:** open the saved project at <https://wokwi.com/projects/480434156220494849> and press ▶.
-
-To rebuild it from this repo instead:
-1. Open <https://wokwi.com/projects/new/arduino-uno>.
-2. Replace `sketch.ino` with [`src/plant_monitor/plant_monitor.ino`](src/plant_monitor/plant_monitor.ino).
-3. Add a new file `control.h` with the contents of [`src/plant_monitor/control.h`](src/plant_monitor/control.h).
-4. Replace `diagram.json` with [`wokwi/diagram.json`](wokwi/diagram.json).
-5. In **Library Manager** add `DHT sensor library` and `LiquidCrystal I2C` (or add a `libraries.txt` with [these lines](wokwi/libraries.txt)).
-6. Press ▶. Click the DHT22, the LDR module or the two potentiometers while it runs to change the readings.
-
-**In VS Code** (Wokwi extension + [arduino-cli](https://arduino.github.io/arduino-cli/)):
-```bash
-arduino-cli core install arduino:avr
-arduino-cli lib install "DHT sensor library" "Adafruit Unified Sensor" "LiquidCrystal I2C"
-arduino-cli compile --fqbn arduino:avr:uno --output-dir build src/plant_monitor
-```
-Then open `wokwi/wokwi.toml` and run **Wokwi: Start Simulator**.
-
-### On real hardware
-Wire it as in the table above, change `#define DHT_TYPE DHT22` to `DHT11` if that is your sensor, recalibrate `SOIL_RAW_DRY` / `SOIL_RAW_WET` for your probe and upload with the Arduino IDE. Open the Serial Monitor at 9600 baud for the CSV log. A real pump needs its own supply on the relay contacts, not the Uno's 5 V.
-
-### Unit tests (any PC with g++)
-```bash
-cd tests
-g++ -std=c++11 -Wall -I../src/plant_monitor test_control.cpp -o test_control && ./test_control
-```
+- **Code:** open a sketch from [`code/`](code/) in the Arduino IDE (board: Arduino Uno) and install the *DHT sensor library* (Adafruit) and *LiquidCrystal_I2C*.
+  - The sketches use the 2020 version of the LCD library (`lcd.begin()` without arguments). Current versions may need `lcd.init()` instead.
+  - [`Assignment.ino`](code/nabeel_temperature/Assignment.ino) uses the *NewLiquidCrystal* library.
+- **Proteus:** open a project from [`simulation/`](simulation/) and set the Arduino's *Program File* to the matching `.hex` in [`code/`](code/).
+  - This needs a licensed copy of Proteus, plus TheEngineeringProjects' Arduino, water-sensor and soil-sensor libraries for Proteus (not included here).
+  - The free Proteus demo does not simulate these models.
 
 ## Repository structure
 
 ```
-src/plant_monitor/   refactored sketch + control.h (decision logic)
-tests/               host-side unit tests for control.h
-wokwi/               diagram.json, libraries.txt, wokwi.toml
-docs/                paper (PDF + LaTeX source), architecture and wiring diagrams
-media/               2020 prototype photos and data log, 2026 simulation screenshot
-original/            my 2020 sketch (light, humidity, water level), unchanged
+code/ali_light_humidity_water/   my individual sketch (light, humidity, water level) + compiled .hex
+code/nabeel_temperature/         Nabeel's individual sketch (LM35 temperature) + .hex
+code/integrated_system/          combined group system + .hex
+simulation/                      Proteus projects: LDR.pdsprj (mine), Assignment.pdsprj (Nabeel), PLANT MONITOR.pdsprj (combined)
+docs/paper/                      paper (PDF + LaTeX source)
+docs/report/                     my individual report from 2020
+media/                           figures, Proteus screenshots, hardware photos, data log
 ```
 
 ## Status
 
-Complete as a portfolio piece. The 2020 hardware no longer exists; the 2026 version is verified in simulation and by unit tests only.
+Complete (2020 course project). Code and simulation files are kept as they were in 2020.
 
 ## What I'd improve
 
-- Replace the bang-bang lamp with PWM dimming (the 2020 design called for a *dimmable* lamp but only switched it).
-- Capacitive soil sensor instead of a resistive one (resistive probes corrode), with a proper two-point calibration routine.
-- Log to an SD card or send data over Wi-Fi (ESP32) instead of a PC-tethered serial log; the 2020 report proposed a GSM SMS alert for low water, which was never built.
-- Run the pump for a timed pulse and wait for the water to soak in, instead of watering until the sensor reads "wet".
+- Fix the defects listed above, and replace the blocking `delay()` loop with `millis()` timing so the system reacts continuously.
+- Add hysteresis and a dry-run interlock so the watering pump can't run with an empty tank.
+- Drive a real pump and lamp through a relay instead of indicator LEDs, and dim the lamp with PWM.
+- Use a capacitive soil sensor with a two-point calibration, and add wireless alerts. The GSM refill alert was proposed in the report but not built.
 
 ## Credits
 
-- Author: Muhammad Ali Sadiq
-- Libraries: [Adafruit DHT sensor library](https://github.com/adafruit/DHT-sensor-library), [LiquidCrystal I2C](https://github.com/johnrickman/LiquidCrystal_I2C).
+- **Muhammad Ali Sadiq:** light, humidity, water-level and soil-moisture subsystems; integration and combined Proteus simulation (with Nabeel); hardware test; individual report.
+- **Nabeel:** temperature subsystem ([`code/nabeel_temperature`](code/nabeel_temperature/), [`simulation/Assignment.pdsprj`](simulation/Assignment.pdsprj)); integration and combined simulation (with Ali).
+- **Shimal:** project documentation.
+- Course: Microprocessor Systems & Embedded Software, Asia Pacific University of Technology & Innovation (APU), 2020.
+- Proteus component models for the Arduino Uno, water sensor and soil sensor: TheEngineeringProjects.
 
-Licensed under the [MIT License](LICENSE).
+*No open-source licence: this repository is shared as a portfolio record and includes work by my teammates.*

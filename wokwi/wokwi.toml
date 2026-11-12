@@ -1,6 +1,0 @@
-# Wokwi for VS Code: compile first (see README), then "Wokwi: Start Simulator".
-# Paths are relative to this file.
-[wokwi]
-version = 1
-firmware = '../build/plant_monitor.ino.hex'
-elf = '../build/plant_monitor.ino.elf'

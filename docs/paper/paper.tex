@@ -2,7 +2,7 @@
 \usepackage[margin=18mm,columnsep=6mm]{geometry}
 \usepackage[T1]{fontenc}
 \usepackage{times}
-\usepackage{graphicx,booktabs,amsmath,xcolor,float,tabularx,array}
+\usepackage{graphicx,booktabs,amsmath,xcolor,float,array}
 \usepackage[font=small,labelfont=bf]{caption}
 \usepackage{titlesec}
 \usepackage[hidelinks]{hyperref}
@@ -18,191 +18,177 @@
 \renewcommand{\thesection}{\Roman{section}}
 \renewcommand{\thesubsection}{\thesection.\Alph{subsection}}
 
-\title{\vspace{-6mm}\Large\bfseries Design and Verification of a Low-Cost Arduino-Based\\ Plant Growth Monitoring and Control System}
-\author{Muhammad Ali Sadiq\\
-\small M.Eng.\ Mechatronics \& Cyber-Physical Systems, Deggendorf Institute of Technology, Germany\\
+\title{\vspace{-6mm}\Large\bfseries Design and Simulation of an Arduino-Based\\ Automated Plant Growing and Monitoring System}
+\author{Muhammad Ali Sadiq\textsuperscript{**}\\
+\small School of Engineering, Asia Pacific University of Technology \& Innovation (APU), Kuala Lumpur, Malaysia\\
 \small \url{https://github.com/turtleshelp/automated-plant-monitoring}}
-\date{\small November 2026}
+\date{\small Course project, August--September 2020}
 
 \begin{document}
 \maketitle
+\begingroup\renewcommand\thefootnote{**}
+\footnotetext{Developed as a group course project (Microprocessor Systems \& Embedded Software, APU). The author designed the light, humidity, water-level and soil-moisture subsystems and, together with Nabeel, integrated and simulated the complete system. Nabeel designed the temperature subsystem; Shimal prepared the project documentation.}
+\endgroup
 
 \begin{abstract}
-\noindent This paper presents a low-cost embedded system that monitors and regulates the growing conditions of a single plant. An Arduino Uno reads light intensity, air temperature, relative humidity, soil moisture and the water level of a supply tank, and switches a grow lamp, fan, heat lamp, water spray and a relay-driven irrigation pump to keep each quantity inside an optimal band. All readings and actuator states are shown on a $20\times4$ character LCD and streamed over a serial link as CSV for logging. The system originated as a 2020 university course project and was redesigned in 2026: the control rules were separated into a hardware-independent module with two-threshold (hysteresis) logic, sensor faults are handled fail-safe, the main loop was made non-blocking, and a dry-run interlock was added for the pump. The design is verified at three levels: 27 host-side unit-test assertions on the decision logic, a full-circuit simulation in Wokwi, and hardware tests of the 2020 prototype. The source code, simulation and wiring diagram are openly available.
+\noindent This paper presents a low-cost embedded system that monitors the growing conditions of a plant and reacts automatically to keep them in an optimal range. An Arduino Uno reads light intensity, air temperature, relative humidity, soil moisture and the water level of a spray tank. Depending on the readings it switches a grow lamp, a fan, a heat lamp, a water spray and a watering indicator, and it shows every reading and action on a $20\times4$ character LCD driven over I$^2$C. The readings are also streamed over a serial link for logging. The system was simulated in Proteus and the light, humidity and water-level functions were tested on hardware. The simulation confirms the light and humidity control rules, and the hardware test reproduces them on a real board. A later review of the firmware identified several defects in the integrated version; these are reported together with the planned improvements.
 \end{abstract}
 
-\noindent\textbf{Keywords:} embedded systems, Arduino, plant monitoring, automatic irrigation, hysteresis control, simulation-based verification
+\noindent\textbf{Keywords:} embedded systems, Arduino, plant monitoring, automatic irrigation, Proteus simulation, environmental sensing
 
 \section{Introduction}
-Keeping a plant in good condition requires regular attention to light, temperature, humidity and soil moisture. Doing this by hand is time-consuming and inconsistent: watering is easily forgotten or overdone, and indoor light and climate change over the day. A small embedded controller can measure these quantities continuously and react automatically, which reduces manual work and avoids wasting water.
+Plants need suitable light, temperature, humidity and soil moisture to grow well. Checking and correcting these conditions by hand takes time, and it is easy to water too much or too little or to leave a lamp switched on. A microcontroller can measure the conditions continuously and react immediately. This reduces the manual work and helps to avoid wasting water.
 
-The goal of this work is a system that is cheap, built from widely available hobby components, and simple enough to verify thoroughly. The contributions are:
+The aim of this project was a monitoring and control system built from inexpensive, widely available components that
 \begin{itemize}\setlength\itemsep{0pt}
-\item a complete sensing-and-actuation design for five environmental quantities on a single 8-bit microcontroller;
-\item a control layer written as a pure function with explicit hysteresis bands and fail-safe behaviour on sensor faults, so that it can be unit-tested on a PC;
-\item a reproducible verification setup: unit tests plus a public full-circuit simulation that anyone can run in a web browser without hardware.
+\item measures five environmental quantities around a plant,
+\item compares each reading with an optimal range and switches the matching actuator,
+\item displays every reading and action locally and logs the data on a PC.
 \end{itemize}
-
-Section~\ref{sec:design} describes the hardware and control design, Section~\ref{sec:impl} the software implementation, Section~\ref{sec:verif} the verification results, and Section~\ref{sec:disc} limitations and future work.
+Section~\ref{sec:design} describes the system design, Section~\ref{sec:sw} the firmware, Section~\ref{sec:results} the simulation and hardware results, and Section~\ref{sec:disc} the limitations and planned improvements.
 
 \section{System Design}\label{sec:design}
 \subsection{Architecture}
-Fig.~\ref{fig:arch} shows the system architecture. Four sensor channels feed an Arduino Uno (ATmega328P, 16\,MHz, 10-bit ADC)~\cite{atmega,uno}. The firmware samples all inputs, evaluates the control rules and updates the outputs once every 2\,s. The outputs are six digital lines (five indicator/actuator channels and one relay), an I$^2$C LCD and a serial log.
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.82\textwidth]{fig/architecture.pdf}
-\caption{System architecture. Each cycle reads all sensors, evaluates the pure decision function \texttt{plant::update()} and then drives the outputs, LCD and serial log.}
-\label{fig:arch}
-\end{figure*}
-
-\subsection{Hardware}
-\textbf{Sensors.} Temperature and relative humidity are measured by a DHT-family single-wire sensor: a DHT11 in the prototype and a DHT22 (AM2302) in the simulation~\cite{dht11,dht22}. Light is measured with a light-dependent resistor (LDR) module whose analogue output rises as the light level falls. Soil moisture and tank water level are measured with analogue probes; in the simulation both are represented by potentiometers.
-
-\textbf{Outputs.} The grow lamp, fan, heat lamp, spray and the tank-refill warning are each represented by an LED with a 220\,$\Omega$ series resistor, which shows the switching decision without mains-powered loads. The irrigation pump is driven through a relay module on D8, so a real pump can be connected to the relay contacts with its own supply. A $20\times4$ HD44780-compatible LCD with an I$^2$C backpack (address 0x27) uses only the A4/A5 bus lines~\cite{hd44780}.
-
-\textbf{Pin assignment.} Table~\ref{tab:pins} lists the pin map; the full wiring is shown in Fig.~\ref{fig:wiring}. Pins D0/D1 are deliberately left free so that the serial log does not conflict with any output.
-
-\begin{table}[h]
-\centering\small
-\caption{Pin assignment (Arduino Uno)}\label{tab:pins}
-\begin{tabular}{@{}ll@{}}
-\toprule
-Pin & Function \\ \midrule
-D2 & DHT11/DHT22 data \\
-A0 & LDR module (analogue) \\
-A1 & Water-level sensor \\
-A2 & Soil-moisture sensor \\
-A4 / A5 & LCD I$^2$C SDA / SCL \\
-D3--D7 & Grow lamp, fan, heat lamp, spray, refill warning \\
-D8 & Relay module input (pump) \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\begin{figure*}[t]
-\centering
-\includegraphics[width=0.86\textwidth]{fig/wiring.pdf}
-\caption{Wiring diagram. All modules share the Uno's 5\,V and GND; each indicator LED has a 220\,$\Omega$ series resistor.}
-\label{fig:wiring}
-\end{figure*}
-
-\subsection{Control Strategy}
-Each quantity is controlled by a simple on/off rule with two thresholds (Table~\ref{tab:rules}). Between the two thresholds the output keeps its previous state. This hysteresis band prevents an actuator from toggling rapidly when a reading hovers around a single set point. The fan is shared: it runs if either the temperature or the humidity is too high.
-
-Two safety rules take priority over the others:
-\begin{itemize}\setlength\itemsep{0pt}
-\item \emph{Dry-run interlock:} when the tank level falls below 20\,\% a refill warning is raised and the pump is forced off. The warning clears only above 30\,\%, so it does not flicker around the threshold.
-\item \emph{Sensor fault:} if the DHT sensor returns no valid reading (NaN), the spray, fan and heat lamp are switched off rather than acting on stale data.
-\end{itemize}
-
-\begin{table}[h]
-\centering\small
-\caption{Control rules. Inside each band the output holds its last state.}\label{tab:rules}
-\begin{tabular}{@{}lll@{}}
-\toprule
-Input & Condition & Action \\ \midrule
-Light (raw ADC) & $>200$ (dark) & Grow lamp ON \\
- & $<150$ (bright) & Grow lamp OFF \\
-Humidity & $>60$\,\% & Fan ON, spray OFF \\
- & $<50$\,\% & Spray ON \\
-Temperature & $>29$\,$^\circ$C & Fan ON \\
- & $<27$\,$^\circ$C & Heat lamp ON \\
-Soil moisture & $<20$\,\% & Pump ON \\
- & $>50$\,\% & Pump OFF \\
-Tank level & $<20$\,\% & Refill warning, pump locked \\
- & $>30$\,\% & Warning cleared \\
-\bottomrule
-\end{tabular}
-\end{table}
-
-\section{Software Implementation}\label{sec:impl}
-\subsection{Structure}
-The firmware is split into two files. \texttt{control.h} contains the thresholds, the \texttt{Readings} and \texttt{Outputs} data types and the decision function. It has no Arduino dependencies, so the same code is compiled for the ATmega328P and for a PC test harness. \texttt{plant\_monitor.ino} contains only the hardware layer: sensor reading, output writing, LCD formatting and the serial log.
-
-The decision function is pure: its result depends only on the current readings and the previous output state.
-\begin{lstlisting}
-Outputs update(const Readings& r,
-               const Outputs& prev);
-\end{lstlisting}
-This makes every rule, including the hysteresis behaviour, testable with simple input sequences.
-
-\subsection{Sensor Conditioning}
-Analogue readings are converted to percentages by a linear two-point mapping that also works for inverted sensors (where a higher ADC value means drier soil) and is clamped to 0--100\,\%. The clamp fixes a defect of the 2020 prototype, whose unclamped mapping produced physically impossible values such as $-86$\,\% moisture when the probe read outside its calibrated range (Section~\ref{sec:proto}).
-
-\subsection{Timing and User Interface}
-The main loop is non-blocking and scheduled with \texttt{millis()}. Sensors are sampled every 2\,s, which respects the minimum sampling interval of the DHT sensors~\cite{dht22}. The prototype instead used a fixed \texttt{delay(2000)} per display screen, so one full update took several seconds and the controller could not react in between. The upper two LCD rows always show the five readings; the lower two rows alternate every 3\,s between the lamp/fan/heat/spray states and the pump/tank states. Each LCD row is written as exactly 20 characters, which overwrites old text without clearing the display and avoids flicker. Every sample is also printed as one CSV line (readings followed by the six output states) at 9600\,baud.
-
-\section{Verification and Results}\label{sec:verif}
-\subsection{Unit Tests}
-The decision logic was tested on a PC (g++ 13, C++11) with 27 assertions covering: the clamped percentage mapping, including the out-of-range case that produced $-86$\,\% in the prototype; each threshold and its hold-in-band behaviour; the fan being driven by temperature \emph{or} humidity; fail-safe shutdown on a DHT fault; pump hysteresis; and the tank-level interlock with its 20/30\,\% hysteresis. All assertions pass. The firmware itself was additionally compiled on the host against stub Arduino headers to check it for syntax and type errors.
-
-\subsection{Full-Circuit Simulation}
-The complete circuit of Fig.~\ref{fig:wiring} was built in Wokwi, a browser-based simulator for the AVR microcontroller and its peripherals~\cite{wokwi}, using the same firmware and the Adafruit DHT and LiquidCrystal\_I2C libraries~\cite{adafruitdht,lcdi2c}. Table~\ref{tab:sim} lists two test cases with the readings and output states taken from the simulated serial log. Both match the rules in Table~\ref{tab:rules}: with an empty tank, the refill warning is raised and the pump is held off even though the soil reads 100\,\% wet; with dry soil and a 68\,\% full tank, the relay is energised and the pump runs. Fig.~\ref{fig:sim} shows the second case: the LCD, the indicator LEDs, the energised relay and the pump LED all match the logged state.
-
-\begin{table}[h]
-\centering\small\setlength{\tabcolsep}{4pt}
-\caption{Simulation test cases (from the Wokwi serial log). L = light (raw ADC), T = temperature, H = humidity, S = soil, W = tank.}\label{tab:sim}
-\begin{tabular}{@{}lcc@{}}
-\toprule
- & Case 1 & Case 2 \\ \midrule
-L / T / H & 250 / 24.0\,$^\circ$C / 40\,\% & 250 / 24.0\,$^\circ$C / 40\,\% \\
-S / W & 100\,\% / 0\,\% & 5\,\% / 68\,\% \\ \midrule
-Grow lamp & ON & ON \\
-Fan & OFF & OFF \\
-Heat lamp & ON & ON \\
-Spray & ON & ON \\
-Pump & \textbf{OFF} (locked) & \textbf{ON} \\
-Refill warning & \textbf{ON} & OFF \\
-\bottomrule
-\end{tabular}
-\end{table}
+Fig.~\ref{fig:block} shows the system architecture. The sensors feed the Arduino Uno, which drives the indicator LEDs and actuators and the LCD. The Arduino Uno is based on the 8-bit ATmega328P microcontroller (16\,MHz, 10-bit ADC, 14 digital I/O pins, 6 analogue inputs)~\cite{atmega,uno}.
 
 \begin{figure}[t]
 \centering
-\includegraphics[width=\columnwidth]{fig/wokwi-simulation.jpg}
-\caption{Wokwi simulation of the full circuit (test case 2). The LCD shows the readings and pump state, the relay is energised and the green pump LED is lit; the serial log is at the bottom.}
-\label{fig:sim}
+\includegraphics[width=\columnwidth]{fig/2020-block-diagram.png}
+\caption{Block diagram of the light and humidity control path. The sensors feed the Arduino Uno, which switches the lamp, the spray and the status LEDs and drives the LCD.}
+\label{fig:block}
 \end{figure}
 
-The simulation is public and runs in a web browser without any hardware: \url{https://wokwi.com/projects/480434156220494849}. Clicking the DHT22, the LDR module or either potentiometer during a run changes the corresponding reading, so each rule in Table~\ref{tab:rules} can be checked interactively.
+\subsection{Hardware}
+\textbf{Sensors.} Temperature and humidity are measured with a DHT11 single-wire sensor on D2~\cite{dht11}. Light intensity is measured with a light-dependent resistor (LDR) on A0. A water-level sensor on A1 monitors the spray tank, and a soil-moisture sensor on A3 measures the water content of the soil.
 
-\subsection{2020 Hardware Prototype}\label{sec:proto}
-The 2020 prototype was built on an Arduino Uno with a DHT11, an LDR, analogue soil-moisture and water-level probes, a $20\times4$ I$^2$C LCD and indicator LEDs, and was tested on the bench. Fig.~\ref{fig:proto} shows three LCD states recorded during these tests: high humidity (73\,\%) switching the fan on, low light (raw ADC 295) switching the lamp on, and an empty tank being reported as low.
+\textbf{Outputs.} The grow lamp, heat lamp and status indicators are LEDs. In the simulation the fan, the spray and the watering pump are DC-motor models. All outputs use the digital pins D0--D13.
+
+\textbf{Display.} A $20\times4$ HD44780-compatible LCD~\cite{hd44780} is connected through a PCF8574 I$^2$C port expander~\cite{pcf8574} at address 0x27. This needs only the two I$^2$C lines (A4/A5) instead of six or more digital pins. Fig.~\ref{fig:ldrcircuit} shows the light and humidity circuit with the I$^2$C LCD.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=\columnwidth]{fig/2020-proteus-light-humidity-circuit.png}
+\caption{Proteus schematic of the light and humidity subsystem: LDR divider on A0, DHT11 on D2, LCD via PCF8574 on A4/A5, and the status LEDs and fan/spray motors on the digital pins.}
+\label{fig:ldrcircuit}
+\end{figure}
+
+\subsection{Control Rules}
+Each quantity is compared with a lower and an upper threshold (Table~\ref{tab:rules}). Below the range the system corrects in one direction, above it in the other, and inside the range it takes no action. For the LDR divider a higher ADC value means less light.
+
+\begin{table}[h]
+\centering\small
+\caption{Control rules}\label{tab:rules}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Input & Condition & Action \\ \midrule
+Light (raw ADC) & $>200$ (dark) & Lamp ON \\
+ & $<150$ (bright) & Lamp OFF \\
+ & 150--200 & No action \\
+Humidity & $>60$\,\% & Fan ON \\
+ & $<50$\,\% & Spray ON \\
+Temperature & $>29\,^\circ$C & Fan ON \\
+ & 27--29\,$^\circ$C & Normal \\
+ & otherwise & Heat lamp ON \\
+Soil moisture & $<20$\,\% & Watering ON \\
+ & $>50$\,\% & Watering OFF \\
+Tank level & $<20$\,\% & ``LOW'' (refill) \\
+ & $>80$\,\% & ``HIGH'' \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Firmware}\label{sec:sw}
+The firmware is written in Arduino C and uses the Adafruit DHT library~\cite{adafruitdht} and the LiquidCrystal\_I2C library~\cite{lcdi2c}. Fig.~\ref{fig:flow} shows the control flow for light and humidity. Each \texttt{loop()} pass first reads all sensors and then handles the subsystems one after another. For each subsystem it prints the reading and the decision on the LCD, sets the corresponding outputs and holds the screen for 2\,s, for example:
+\begin{lstlisting}
+if (ldrStatus > 200) {          // dark
+  digitalWrite(ledPin13, HIGH); // lamp on
+  lcd.print("ITS DARK");
+  ...
+  delay(2000);
+}
+\end{lstlisting}
+The analogue sensors are converted to percentages from the ADC reading. Each reading is also printed over the serial port at 9600\,baud as comma-separated values, so it can be logged on a PC.
+
+\begin{figure}[t]
+\centering
+\includegraphics[width=0.92\columnwidth]{fig/2020-flowchart.png}
+\caption{Control flow of the light and humidity subsystems.}
+\label{fig:flow}
+\end{figure}
+
+\section{Simulation and Results}\label{sec:results}
+\subsection{Proteus Simulation}
+The system was simulated in Proteus, which co-simulates the microcontroller firmware with the connected circuit~\cite{proteus}. The compiled firmware (\texttt{.hex}) is loaded into the Arduino model, and the LDR light level and the DHT11 readings are changed interactively. Fig.~\ref{fig:lcd} shows the LCD for three light levels and three humidity levels. In each case the displayed decision matches Table~\ref{tab:rules}. A reading of 214 is reported as dark with the lamp switched on, 124 as bright with the lamp off, and 167 as optimal. A humidity of 66\,\% switches the fan on, 46\,\% switches the spray on, and 52\,\% is optimal. The corresponding LEDs and motor models switched with the displayed state. Fig.~\ref{fig:integrated} shows the integrated system with all five sensors.
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.85\textwidth]{fig/2020-proteus-lcd-states.png}
+\caption{LCD output in the Proteus simulation for three light levels (top) and three humidity levels (bottom).}
+\label{fig:lcd}
+\end{figure*}
+
+\begin{figure*}[t]
+\centering
+\includegraphics[width=0.85\textwidth]{fig/2020-proteus-integrated-system.png}
+\caption{Proteus schematic of the integrated system: Arduino Uno with LDR, DHT11, water-level sensor, soil-moisture sensor, I$^2$C LCD, status LEDs and fan, spray and pump motor models.}
+\label{fig:integrated}
+\end{figure*}
+
+\subsection{Hardware Test}
+The firmware was then run on a real Arduino Uno with a DHT11, an LDR, a water-level sensor and a $20\times4$ I$^2$C LCD. Fig.~\ref{fig:hw} shows three of the recorded states. High humidity (73\,\%) switched the fan on, low light (raw ADC 295) switched the lamp on, and an empty tank (0\,\%) was reported as low.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=0.32\columnwidth]{fig/2020-hardware-lcd-humidity.jpg}\hfill
 \includegraphics[width=0.32\columnwidth]{fig/2020-hardware-lcd-light.jpg}\hfill
 \includegraphics[width=0.32\columnwidth]{fig/2020-hardware-lcd-water-level.jpg}
-\caption{2020 prototype on hardware: high humidity $\rightarrow$ fan on (left), dark $\rightarrow$ light on (centre), tank level 0\,\% (right).}
-\label{fig:proto}
+\caption{Hardware test: high humidity $\rightarrow$ fan on (left), dark $\rightarrow$ light on (centre), tank level 0\,\% (right).}
+\label{fig:hw}
 \end{figure}
 
-Readings were streamed over serial into a spreadsheet logger (Fig.~\ref{fig:log}). Over 15 samples spanning 31\,s at room conditions, the readings were stable: light 276--280, temperature 28.1--28.2\,$^\circ$C and humidity 76--77\,\%. The moisture channel, however, read $-85$ to $-86$\,\%. This is consistent with the prototype's unclamped mapping \texttt{map(raw, 550, 10, 0, 100)}: a raw reading near the top of the ADC range, as from a dry or disconnected probe, gives about $-86$\,\%. The 2026 design clamps the result (Section~\ref{sec:impl}) and covers this case with a unit test.
+\subsection{Data Logging}
+The serial output was streamed into a spreadsheet with Excel Data Streamer (Fig.~\ref{fig:log}). Over 15 samples spanning 31\,s at room conditions the readings were stable: light 276--280, temperature 28.1--28.2\,$^\circ$C and humidity 76--77\,\%. The moisture channel, however, logged $-85$ to $-86$\,\%, a physically impossible value that points to the calibration defect discussed in Section~\ref{sec:disc}.
 
 \begin{figure}[t]
 \centering
 \includegraphics[width=\columnwidth]{fig/2020-data-log.png}
-\caption{Serial data log of the 2020 prototype. The negative moisture values reveal the unclamped-mapping defect fixed in the 2026 design.}
+\caption{Serial data log of the system in Excel Data Streamer.}
 \label{fig:log}
 \end{figure}
 
-A review of the prototype firmware found further defects that the redesign removes: range checks written as \texttt{150 > x < 200}, which C evaluates as \texttt{(150 > x) < 200} and is therefore always true; indicator LEDs on D0/D1, which conflict with the serial port; and re-initialisation of the LCD on every loop iteration.
-
 \section{Discussion and Limitations}\label{sec:disc}
-The 2026 design has been verified in simulation and by unit tests only; it has not been rebuilt on hardware. The lamp, fan, heat lamp and spray are represented by LEDs, and no real pump has been driven. The soil and tank calibration constants come from the prototype and have not been re-measured. The thresholds are fixed values chosen for a generic indoor plant; they are not tuned to a particular species. On/off control with hysteresis is appropriate for these slow processes, but watering until the probe reads ``wet'' can overshoot because water takes time to soak through the soil.
+The simulation and the hardware test confirm the light and humidity control and the water-level display. A later review of the firmware found the following defects, mainly in the integrated version:
+\begin{itemize}\setlength\itemsep{0pt}
+\item The tank level is computed from the soil sensor's pin (A3) instead of the water-level sensor (A1), so it repeats the soil reading.
+\item In the integrated version the humidity thresholds were changed to $>50$\,\% and $<0$\,\%, so the spray can never switch on.
+\item The soil mapping \texttt{map(raw, 550, 10, 0, 100)} is not clamped, so out-of-range readings give negative percentages (the likely cause of the logged $-86$\,\%). Its result is also overwritten by a second variable with the same name.
+\item Exactly 29\,$^\circ$C is classified as ``too low'' and switches the heat lamp on.
+\item Range checks written as \texttt{150 > x < 200} are not valid comparisons in C. They give the intended result only because they are reached after the other two branches.
+\item Two indicator LEDs use D0/D1, which are shared with the serial port used for logging.
+\item A failed DHT reading (NaN) falls through to the ``optimal'' branch instead of being reported as an error.
+\item The \texttt{delay(2000)} per screen makes one loop pass take several seconds, so the system reacts slowly.
+\end{itemize}
+In addition, the lamp, fan, spray and pump were represented by LEDs and motor models, and no mains-powered actuators were connected.
 
 \section{Conclusion and Future Work}
-A low-cost plant monitoring and control system was designed around an Arduino Uno and five sensed quantities, with a hardware-independent decision layer, hysteresis on every actuator, fail-safe handling of sensor faults and a dry-run interlock for the pump. Unit tests, a public full-circuit simulation and prototype hardware tests show that the control rules behave as specified, and the redesign removes the defects found in the prototype. Future work includes: PWM dimming of the grow lamp instead of on/off switching; capacitive soil probes with a two-point calibration routine; pulsed watering with a soak delay; wireless logging and alerts, for example on an ESP32; and a hardware rebuild with real actuators to validate the simulation results.
+An Arduino-based system for monitoring and controlling the growing conditions of a plant was designed, simulated in Proteus and tested on hardware. The light and humidity control behaved as specified in both the simulation and the hardware test, and the LCD interface and serial logging worked as intended. The firmware review identified concrete defects in the integrated version. The next steps are:
+\begin{itemize}\setlength\itemsep{0pt}
+\item fix these defects and add hysteresis and a dry-run interlock for the pump;
+\item replace the blocking delays with \texttt{millis()}-based timing;
+\item drive real actuators through relays and dim the lamp with PWM;
+\item add a GSM module for remote refill alerts, as proposed in the original design.
+\end{itemize}
+
+\section*{Contributions}
+\small M.~A.~Sadiq: light, humidity, water-level and soil-moisture subsystems; integration and Proteus simulation of the complete system (with Nabeel); hardware test and data logging. Nabeel: temperature subsystem; integration and simulation (with M.~A.~Sadiq). Shimal: project documentation. The Proteus models of the Arduino Uno, water sensor and soil-moisture sensor are from TheEngineeringProjects.
 
 \begin{thebibliography}{9}\small\setlength\itemsep{1pt}
 \bibitem{atmega} Microchip Technology, \emph{ATmega328P Datasheet}. [Online]. Available: \url{https://www.microchip.com/en-us/product/ATmega328P}
 \bibitem{uno} Arduino, \emph{Arduino UNO R3 Documentation}. [Online]. Available: \url{https://docs.arduino.cc/hardware/uno-rev3}
 \bibitem{dht11} Aosong Electronics, \emph{DHT11 Humidity \& Temperature Sensor Datasheet}.
-\bibitem{dht22} Aosong Electronics, \emph{AM2302 (DHT22) Digital-Output Relative Humidity \& Temperature Sensor Datasheet}.
 \bibitem{hd44780} Hitachi, \emph{HD44780U (LCD-II) Dot Matrix Liquid Crystal Display Controller/Driver Datasheet}.
-\bibitem{wokwi} Wokwi, \emph{Wokwi Online Electronics Simulator}. [Online]. Available: \url{https://wokwi.com}
+\bibitem{pcf8574} Texas Instruments, \emph{PCF8574 Remote 8-Bit I/O Expander for I$^2$C Bus Datasheet}.
+\bibitem{proteus} Labcenter Electronics, \emph{Proteus VSM Simulation}. [Online]. Available: \url{https://www.labcenter.com/simulation}
 \bibitem{adafruitdht} Adafruit Industries, \emph{DHT Sensor Library}. [Online]. Available: \url{https://github.com/adafruit/DHT-sensor-library}
 \bibitem{lcdi2c} F.~de~Brabander \emph{et al.}, \emph{LiquidCrystal\_I2C Library}. [Online]. Available: \url{https://github.com/johnrickman/LiquidCrystal_I2C}
 \end{thebibliography}

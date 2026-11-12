@@ -1,22 +1,10 @@
-# Build output
-build/
-*.hex
-*.elf
-*.bin
-
-# Host test binaries
-tests/test_control
-tests/*.exe
-
-# Proteus backups / workspaces
+# Proteus backups / per-machine workspace files
 *.pdsbak
 *.workspace
+Project Backups/
 
-# OS / editor
-.DS_Store
-Thumbs.db
-desktop.ini
-.vscode/
+# Arduino build output
+build/
 
 # LaTeX build files
 *.aux
@@ -25,3 +13,9 @@ desktop.ini
 *.fls
 *.fdb_latexmk
 *.synctex.gz
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
