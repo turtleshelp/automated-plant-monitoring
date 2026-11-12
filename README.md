@@ -57,7 +57,7 @@ The firmware reads every sensor at the start of each loop, then works through th
 
 ### Circuit (Proteus)
 
-My light, humidity and LCD circuit ([`simulation/LDR.pdsprj`](simulation/LDR.pdsprj)):
+My light, humidity and LCD circuit ([`simulation/light_humidity_water_control.pdsprj`](simulation/light_humidity_water_control.pdsprj)):
 
 ![Light and humidity circuit](media/2020-proteus-light-humidity-circuit.png)
 
@@ -83,7 +83,7 @@ Pin use: LDR on A0, water level on A1, soil moisture on A3 (integrated system), 
 
 A 2026 review of the code found these defects. They are left in the code as it was in 2020:
 
-- **Integrated system** ([`PLANT_MONITOR.ino`](code/integrated_system/PLANT_MONITOR.ino)):
+- **Integrated system** ([`plant_monitor_integrated.ino`](code/plant_monitor_integrated/plant_monitor_integrated.ino)):
   - the water level is calculated from the soil sensor's pin (A3) instead of the water sensor (A1);
   - the humidity limits were changed to `> 50` / `< 0`, so the spray can never switch on;
   - the soil mapping `map(raw, 550, 10, 0, 100)` is not clamped (the likely source of the −86 % moisture in the data log) and is then overwritten by a second variable with the same name;
@@ -98,7 +98,7 @@ A 2026 review of the code found these defects. They are left in the code as it w
 
 - **Code:** open a sketch from [`code/`](code/) in the Arduino IDE (board: Arduino Uno) and install the *DHT sensor library* (Adafruit) and *LiquidCrystal_I2C*.
   - The sketches use the 2020 version of the LCD library (`lcd.begin()` without arguments). Current versions may need `lcd.init()` instead.
-  - [`Assignment.ino`](code/nabeel_temperature/Assignment.ino) uses the *NewLiquidCrystal* library.
+  - [`temperature_control.ino`](code/temperature_control/temperature_control.ino) uses the *NewLiquidCrystal* library.
 - **Proteus:** open a project from [`simulation/`](simulation/) and set the Arduino's *Program File* to the matching `.hex` in [`code/`](code/).
   - This needs a licensed copy of Proteus, plus TheEngineeringProjects' Arduino, water-sensor and soil-sensor libraries for Proteus (not included here).
   - The free Proteus demo does not simulate these models.
@@ -106,10 +106,10 @@ A 2026 review of the code found these defects. They are left in the code as it w
 ## Repository structure
 
 ```
-code/ali_light_humidity_water/   my individual sketch (light, humidity, water level) + compiled .hex
-code/nabeel_temperature/         Nabeel's individual sketch (LM35 temperature) + .hex
-code/integrated_system/          combined group system + .hex
-simulation/                      Proteus projects: LDR.pdsprj (mine), Assignment.pdsprj (Nabeel), PLANT MONITOR.pdsprj (combined)
+code/light_humidity_water_control/   my sketch: light, humidity, water level (+ compiled .hex)
+code/temperature_control/            Nabeel's sketch: LM35 temperature (+ .hex)
+code/plant_monitor_integrated/       combined system: all five subsystems (+ .hex)
+simulation/                          Proteus projects with the same names as the sketches
 docs/paper/                      paper (PDF + LaTeX source)
 docs/report/                     my individual report from 2020
 media/                           figures, Proteus screenshots, hardware photos, data log
@@ -129,7 +129,7 @@ Complete (2020 course project). Code and simulation files are kept as they were 
 ## Credits
 
 - **Muhammad Ali Sadiq:** light, humidity, water-level and soil-moisture subsystems; integration and combined Proteus simulation (with Nabeel); hardware test; individual report.
-- **Nabeel:** temperature subsystem ([`code/nabeel_temperature`](code/nabeel_temperature/), [`simulation/Assignment.pdsprj`](simulation/Assignment.pdsprj)); integration and combined simulation (with Ali).
+- **Nabeel:** temperature subsystem ([`code/temperature_control`](code/temperature_control/), [`simulation/temperature_control.pdsprj`](simulation/temperature_control.pdsprj)); integration and combined simulation (with Ali).
 - **Shimal:** project documentation.
 - Course: Microprocessor Systems & Embedded Software, Asia Pacific University of Technology & Innovation (APU), 2020.
 - Proteus component models for the Arduino Uno, water sensor and soil sensor: TheEngineeringProjects.
